@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ユーザー管理 - ファイル配布サイト</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">ファイル配布サイト</div>
+      <div class="header-right">
+        <% if (currentUser) { %>
+          <span class="user-label"><%= currentUser.full_name || currentUser.username %>（<%= currentUser.role %>）</span>
+        <% } %>
+        <button type="button" class="theme-toggle" id="theme-toggle">🌓</button>
+        <% if (currentUser) { %>
+          <button type="button" class="menu-toggle" id="menu-toggle">☰</button>
+        <% } %>
+      </div>
+    </header>
+
+    <% if (currentUser) { %>
+    <nav class="overlay-menu" id="overlay-menu">
+      <div class="overlay-inner">
+        <button type="button" class="close-btn" id="menu-close">×</button>
+        <ul>
+          <li><a href="/dashboard">マイファイル</a></li>
+          <li><a href="/account">アカウント設定</a></li>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager') { %>
+            <li><a href="/admin/users">ユーザー管理</a></li>
+            <li><a href="/admin/groups">グループ管理</a></li>
+          <% } %>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager' || currentUser.role === 'file-manager') { %>
+            <li><a href="/admin/files">ファイル管理</a></li>
+          <% } %>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager') { %>
+            <li><a href="/admin/logs">操作ログ</a></li>
+          <% } %>
+          <li><a href="/logout">ログアウト</a></li>
+        </ul>
+      </div>
+    </nav>
+    <% } %>
+
+    <main class="container">
+      <h1>ユーザー管理</h1>
+
+      <section class="card">
+        <h2>検索・フィルタ</h2>
+        <form method="get" action="/admin/users" class="form inline-form">
+          <input type="text" name="q" placeholder="ユーザー名・氏名" value="<%= filters.q %>" />
+          <select name="role">
+            <option value="">権限：すべて</option>
+            <% ['root','manager','file-manager','user'].forEach(r => { %>
+              <option value="<%= r %>" <%= filters.role === r ? 'selected' : '' %>><%= r %></option>
+            <% }) %>
+          </select>
+          <select name="status">
+            <option value="">状態：すべて</option>
+            <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>有効のみ</option>
+            <option value="inactive" <%= filters.status === 'inactive' ? 'selected' : '' %>>無効のみ</option>
+          </select>
+          <button type="submit">絞り込み</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>ユーザー新規作成</h2>
+        <form method="post" action="/admin/users/create" class="form">
+          <label>ユーザー名
+            <input type="text" name="username" required />
+          </label>
+          <label>パスワード
+            <input type="password" name="password" required />
+          </label>
+          <label>氏名（任意）
+            <input type="text" name="full_name" />
+          </label>
+          <label>メモ（任意）
+            <input type="text" name="note" />
+          </label>
+          <label>権限
+            <select name="role">
+              <option value="user">user</option>
+              <option value="file-manager">file-manager</option>
+              <option value="manager">manager</option>
+              <option value="root">root</option>
+            </select>
+          </label>
+          <button type="submit">作成</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>CSV一括登録</h2>
+        <form method="post" action="/admin/users/import" enctype="multipart/form-data" class="form">
+          <label>CSVファイル
+            <input type="file" name="csv" accept=".csv" required />
+          </label>
+          <p class="hint">形式：username,password,full_name,note,role</p>
+          <button type="submit">インポート</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>ユーザー一覧</h2>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>ユーザー名</th>
+              <th>氏名</th>
+              <th>権限</th>
+              <th>状態</th>
+              <th>メモ</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach(u => { %>
+              <tr>
+                <td><%= u.id %></td>
+                <td><%= u.username %></td>
+                <td><%= u.full_name || '—' %></td>
+                <td><%= u.role %></td>
+                <td><%= u.is_active ? '有効' : '無効' %></td>
+                <td><%= u.note || '—' %></td>
+                <td class="actions">
+                  <form method="post" action="/admin/users/<%= u.id %>/edit" class="inline-form">
+                    <input type="text" name="full_name" value="<%= u.full_name || '' %>" placeholder="氏名" />
+                    <input type="text" name="note" value="<%= u.note || '' %>" placeholder="メモ" />
+                    <select name="role">
+                      <option value="user" <%= u.role === 'user' ? 'selected' : '' %>>user</option>
+                      <option value="file-manager" <%= u.role === 'file-manager' ? 'selected' : '' %>>file-manager</option>
+                      <option value="manager" <%= u.role === 'manager' ? 'selected' : '' %>>manager</option>
+                      <option value="root" <%= u.role === 'root' ? 'selected' : '' %>>root</option>
+                    </select>
+                    <button type="submit">更新</button>
+                  </form>
+                  <form method="post" action="/admin/users/<%= u.id %>/toggle" class="inline-form">
+                    <input type="hidden" name="active" value="<%= u.is_active ? 0 : 1 %>" />
+                    <button type="submit"><%= u.is_active ? '無効化' : '有効化' %></button>
+                  </form>
+                  <form method="post" action="/admin/users/<%= u.id %>/delete" class="inline-form" onsubmit="return confirm('本当に削除しますか？');">
+                    <button type="submit">削除</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </section>
+
+    </main>
+    <script src="/main.js"></script>
+  </body>
+</html>

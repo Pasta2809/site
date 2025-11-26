@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>アカウント設定 - ファイル配布サイト</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">ファイル配布サイト</div>
+      <div class="header-right">
+        <% if (currentUser) { %>
+          <span class="user-label"><%= currentUser.full_name || currentUser.username %>（<%= currentUser.role %>）</span>
+        <% } %>
+        <button type="button" class="theme-toggle" id="theme-toggle">🌓</button>
+        <% if (currentUser) { %>
+          <button type="button" class="menu-toggle" id="menu-toggle">☰</button>
+        <% } %>
+      </div>
+    </header>
+
+    <% if (currentUser) { %>
+    <nav class="overlay-menu" id="overlay-menu">
+      <div class="overlay-inner">
+        <button type="button" class="close-btn" id="menu-close">×</button>
+        <ul>
+          <li><a href="/dashboard">マイファイル</a></li>
+          <li><a href="/account">アカウント設定</a></li>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager') { %>
+            <li><a href="/admin/users">ユーザー管理</a></li>
+            <li><a href="/admin/groups">グループ管理</a></li>
+          <% } %>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager' || currentUser.role === 'file-manager') { %>
+            <li><a href="/admin/files">ファイル管理</a></li>
+          <% } %>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager') { %>
+            <li><a href="/admin/logs">操作ログ</a></li>
+          <% } %>
+          <li><a href="/logout">ログアウト</a></li>
+        </ul>
+      </div>
+    </nav>
+    <% } %>
+
+    <main class="container">
+      <h1>アカウント設定</h1>
+      <% if (message) { %>
+        <div class="alert alert-success"><%= message %></div>
+      <% } %>
+      <% if (error) { %>
+        <div class="alert alert-error"><%= error %></div>
+      <% } %>
+      <section class="card">
+        <form method="post" action="/account" class="form">
+          <label>現在のパスワード
+            <input type="password" name="current_password" required />
+          </label>
+          <label>新しいパスワード
+            <input type="password" name="new_password" required />
+          </label>
+          <label>新しいパスワード（確認）
+            <input type="password" name="new_password_confirm" required />
+          </label>
+          <button type="submit">変更</button>
+        </form>
+      </section>
+
+    </main>
+    <script src="/main.js"></script>
+  </body>
+</html>

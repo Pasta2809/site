@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ファイル管理 - ファイル配布サイト</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">ファイル配布サイト</div>
+      <div class="header-right">
+        <% if (currentUser) { %>
+          <span class="user-label"><%= currentUser.full_name || currentUser.username %>（<%= currentUser.role %>）</span>
+        <% } %>
+        <button type="button" class="theme-toggle" id="theme-toggle">🌓</button>
+        <% if (currentUser) { %>
+          <button type="button" class="menu-toggle" id="menu-toggle">☰</button>
+        <% } %>
+      </div>
+    </header>
+
+    <% if (currentUser) { %>
+    <nav class="overlay-menu" id="overlay-menu">
+      <div class="overlay-inner">
+        <button type="button" class="close-btn" id="menu-close">×</button>
+        <ul>
+          <li><a href="/dashboard">マイファイル</a></li>
+          <li><a href="/account">アカウント設定</a></li>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager') { %>
+            <li><a href="/admin/users">ユーザー管理</a></li>
+            <li><a href="/admin/groups">グループ管理</a></li>
+          <% } %>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager' || currentUser.role === 'file-manager') { %>
+            <li><a href="/admin/files">ファイル管理</a></li>
+          <% } %>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager') { %>
+            <li><a href="/admin/logs">操作ログ</a></li>
+          <% } %>
+          <li><a href="/logout">ログアウト</a></li>
+        </ul>
+      </div>
+    </nav>
+    <% } %>
+
+    <main class="container">
+      <h1>ファイル管理</h1>
+
+      <section class="card">
+        <h2>検索・フィルタ</h2>
+        <form method="get" action="/admin/files" class="form inline-form">
+          <input type="text" name="q" placeholder="ファイル名・説明" value="<%= filters.q %>" />
+          <select name="type">
+            <option value="">種類：すべて</option>
+            <option value="pdf" <%= filters.type === 'pdf' ? 'selected' : '' %>>PDF</option>
+            <option value="image" <%= filters.type === 'image' ? 'selected' : '' %>>画像</option>
+          </select>
+          <select name="expired">
+            <option value="">期限：すべて</option>
+            <option value="only" <%= filters.expired === 'only' ? 'selected' : '' %>>期限切れのみ</option>
+            <option value="has" <%= filters.expired === 'has' ? 'selected' : '' %>>期限ありのみ</option>
+            <option value="no" <%= filters.expired === 'no' ? 'selected' : '' %>>期限なしのみ</option>
+          </select>
+          <label>登録日 from
+            <input type="date" name="from" value="<%= filters.from %>" />
+          </label>
+          <label>to
+            <input type="date" name="to" value="<%= filters.to %>" />
+          </label>
+          <select name="folder">
+            <option value="">フォルダ：すべて</option>
+            <% folders.forEach(f => { %>
+              <option value="<%= f %>" <%= filters.folder === f ? 'selected' : '' %>><%= f %></option>
+            <% }) %>
+          </select>
+          <select name="category">
+            <option value="">カテゴリ：すべて</option>
+            <% categories.forEach(c => { %>
+              <option value="<%= c %>" <%= filters.category === c ? 'selected' : '' %>><%= c %></option>
+            <% }) %>
+          </select>
+          <button type="submit">絞り込み</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>ファイルアップロード</h2>
+        <form method="post" action="/admin/files/upload" enctype="multipart/form-data" class="form">
+          <label>ファイル
+            <input type="file" name="file" required />
+          </label>
+          <label>説明文（任意）
+            <textarea name="description" rows="2"></textarea>
+          </label>
+          <label>フォルダ（任意）
+            <input type="text" name="folder" placeholder="例：2025年度 / 保護者向け" />
+          </label>
+          <label>カテゴリ（任意・カンマ区切り）
+            <input type="text" name="category" placeholder="例：テスト,重要" />
+          </label>
+          <label>ダウンロード期限（任意）
+            <input type="date" name="expires_date" />
+          </label>
+          <button type="submit">アップロード</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>ファイル割り当て</h2>
+        <p class="hint">① 割り当てるファイルを選ぶ → ② ユーザー or グループを選ぶ → ③ 割り当てボタンを押す、という流れです。</p>
+
+        <div class="assign-layout">
+          <div class="assign-block">
+            <h3>ファイルを選択</h3>
+            <select id="assign-file-select">
+              <% if (!files.length) { %>
+                <option value="">（ファイルがありません）</option>
+              <% } else { %>
+                <% files.forEach(f => { %>
+                  <option value="<%= f.id %>">
+                    [<%= f.id %>] <%= f.original_name %>
+                    <% if (f.folder) { %>（<%= f.folder %>）<% } %>
+                  </option>
+                <% }) %>
+              <% } %>
+            </select>
+          </div>
+
+          <div class="assign-block">
+            <h3>ユーザーに割り当て</h3>
+            <form method="post" action="/admin/files/assign" class="form inline-form" onsubmit="return assignSyncFileId(this);">
+              <input type="hidden" name="file_id" value="" />
+              <select name="user_id" required>
+                <% if (!users.length) { %>
+                  <option value="">（有効なユーザーがいません）</option>
+                <% } else { %>
+                  <% users.forEach(u => { %>
+                    <option value="<%= u.id %>">
+                      <%= u.username %><% if (u.full_name) { %>（<%= u.full_name %>）<% } %>
+                    </option>
+                  <% }) %>
+                <% } %>
+              </select>
+              <button type="submit">ユーザーに割当</button>
+            </form>
+          </div>
+
+          <div class="assign-block">
+            <h3>グループに割り当て</h3>
+            <form method="post" action="/admin/files/assign-group" class="form inline-form" onsubmit="return assignSyncFileId(this);">
+              <input type="hidden" name="file_id" value="" />
+              <select name="group_id" required>
+                <% if (!groups.length) { %>
+                  <option value="">（グループがありません）</option>
+                <% } else { %>
+                  <% groups.forEach(g => { %>
+                    <option value="<%= g.id %>"><%= g.name %></option>
+                  <% }) %>
+                <% } %>
+              </select>
+              <button type="submit">グループに割当</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>ファイル一覧</h2>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>フォルダ</th>
+              <th>ファイル名</th>
+              <th>説明</th>
+              <th>カテゴリ</th>
+              <th>登録日</th>
+              <th>期限</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% files.forEach(f => {
+                 const isImage = f.mime_type && f.mime_type.startsWith('image/');
+                 const isPdf = f.mime_type === 'application/pdf';
+            %>
+              <tr
+                data-file-id="<%= f.id %>"
+                data-file-name="<%- f.original_name %>"
+                data-file-description="<%- f.description || '' %>"
+                data-file-expires="<%- f.expires_at || '' %>"
+                data-file-folder="<%- f.folder || '' %>"
+                data-file-category="<%- f.category || '' %>"
+              >
+                <td><%= f.id %></td>
+                <td><%= f.folder || '—' %></td>
+                <td>
+                  <% if (isImage) { %>
+                    <div class="file-with-thumb">
+                      <img src="/files/<%= f.id %>/preview" alt="thumb" class="thumb" />
+                      <span><%= f.original_name %></span>
+                    </div>
+                  <% } else { %>
+                    <%= f.original_name %>
+                  <% } %>
+                  <div>
+                    <% if (isPdf || isImage) { %>
+                      <a href="/files/<%= f.id %>/preview" target="_blank">プレビュー</a>
+                    <% } %>
+                  </div>
+                </td>
+                <td>
+                  <% if (f.description) { %>
+                    <span title="<%- f.description %>">
+                      <%= f.description.length > 40 ? f.description.slice(0, 40) + '…' : f.description %>
+                    </span>
+                  <% } else { %>
+                    —
+                  <% } %>
+                </td>
+                <td>
+                  <% if (f.category) {
+                       const tags = f.category.split(',').map(s => s.trim()).filter(Boolean);
+                  %>
+                    <% tags.forEach(t => { %>
+                      <span class="tag"><%= t %></span>
+                    <% }); %>
+                  <% } else { %>
+                    —
+                  <% } %>
+                </td>
+                <td><%= f.uploaded_at %></td>
+                <td>
+                  <% if (f.expires_at) { %>
+                    <%= f.expires_at %>
+                  <% } else { %>
+                    期限なし
+                  <% } %>
+                </td>
+                <td class="actions">
+                  <button type="button" class="secondary file-edit-btn">編集</button>
+                  <a href="/admin/files/<%= f.id %>/history" class="secondary">履歴</a>
+                  <form method="post" action="/admin/files/<%= f.id %>/delete" class="inline-form" onsubmit="return confirm('ファイルを削除しますか？');">
+                    <button type="submit">削除</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- 編集モーダル -->
+      <div id="file-edit-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+          <h3>ファイル情報の編集</h3>
+          <form method="post" action="/admin/files/update-meta" class="form" id="file-edit-form">
+            <input type="hidden" name="file_id" id="edit-file-id" />
+            <p id="edit-file-name" class="bold"></p>
+            <label>説明文
+              <textarea name="description" id="edit-description" rows="3"></textarea>
+            </label>
+            <label>フォルダ
+              <input type="text" name="folder" id="edit-folder" />
+            </label>
+            <label>カテゴリ（カンマ区切り）
+              <input type="text" name="category" id="edit-category" />
+            </label>
+            <label>期限（日付・空で期限なし）
+              <input type="date" name="expires_date" id="edit-expires-date" />
+            </label>
+            <div class="modal-actions">
+              <button type="submit">保存</button>
+              <button type="button" id="edit-cancel-btn" class="secondary">キャンセル</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </main>
+    <script src="/main.js"></script>
+  </body>
+</html>

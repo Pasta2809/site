@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>マイファイル - ファイル配布サイト</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">ファイル配布サイト</div>
+      <div class="header-right">
+        <% if (currentUser) { %>
+          <span class="user-label"><%= currentUser.full_name || currentUser.username %>（<%= currentUser.role %>）</span>
+        <% } %>
+        <button type="button" class="theme-toggle" id="theme-toggle">🌓</button>
+        <% if (currentUser) { %>
+          <button type="button" class="menu-toggle" id="menu-toggle">☰</button>
+        <% } %>
+      </div>
+    </header>
+
+    <% if (currentUser) { %>
+    <nav class="overlay-menu" id="overlay-menu">
+      <div class="overlay-inner">
+        <button type="button" class="close-btn" id="menu-close">×</button>
+        <ul>
+          <li><a href="/dashboard">マイファイル</a></li>
+          <li><a href="/account">アカウント設定</a></li>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager') { %>
+            <li><a href="/admin/users">ユーザー管理</a></li>
+            <li><a href="/admin/groups">グループ管理</a></li>
+          <% } %>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager' || currentUser.role === 'file-manager') { %>
+            <li><a href="/admin/files">ファイル管理</a></li>
+          <% } %>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager') { %>
+            <li><a href="/admin/logs">操作ログ</a></li>
+          <% } %>
+          <li><a href="/logout">ログアウト</a></li>
+        </ul>
+      </div>
+    </nav>
+    <% } %>
+
+    <main class="container">
+      <h1>マイファイル</h1>
+
+      <section class="card">
+        <h2>検索・絞り込み</h2>
+        <form method="get" action="/dashboard" class="form inline-form">
+          <input type="text" name="q" placeholder="キーワード（ファイル名・説明）" value="<%= filters.q %>" />
+          <select name="folder">
+            <option value="">フォルダ：すべて</option>
+            <% folders.forEach(f => { %>
+              <option value="<%= f %>" <%= filters.folder === f ? 'selected' : '' %>><%= f %></option>
+            <% }) %>
+          </select>
+          <select name="category">
+            <option value="">カテゴリ：すべて</option>
+            <% categories.forEach(c => { %>
+              <option value="<%= c %>" <%= filters.category === c ? 'selected' : '' %>><%= c %></option>
+            <% }) %>
+          </select>
+          <button type="submit">絞り込み</button>
+        </form>
+      </section>
+
+      <% if (!files.length) { %>
+        <p>現在表示できるファイルはありません。</p>
+      <% } else { %>
+      <section class="card">
+        <form method="post" action="/files/bulk-zip">
+          <table class="table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="check-all" /></th>
+                <th>フォルダ</th>
+                <th>ファイル</th>
+                <th>説明</th>
+                <th>カテゴリ</th>
+                <th>登録日</th>
+                <th>期限</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% files.forEach(f => {
+                   const isImage = f.mime_type && f.mime_type.startsWith('image/');
+                   const isPdf = f.mime_type === 'application/pdf';
+              %>
+                <tr>
+                  <td><input type="checkbox" name="file_ids" value="<%= f.id %>" /></td>
+                  <td><%= f.folder || '—' %></td>
+                  <td>
+                    <% if (isImage) { %>
+                      <div class="file-with-thumb">
+                        <img src="/files/<%= f.id %>/preview" alt="thumb" class="thumb" />
+                        <span><%= f.original_name %></span>
+                      </div>
+                    <% } else { %>
+                      <%= f.original_name %>
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (f.description) { %>
+                      <span title="<%- f.description %>">
+                        <%= f.description.length > 40 ? f.description.slice(0, 40) + '…' : f.description %>
+                      </span>
+                    <% } else { %>
+                      —
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (f.category) {
+                         const tags = f.category.split(',').map(s => s.trim()).filter(Boolean);
+                    %>
+                      <% tags.forEach(t => { %>
+                        <span class="tag"><%= t %></span>
+                      <% }); %>
+                    <% } else { %>
+                      —
+                    <% } %>
+                  </td>
+                  <td><%= f.uploaded_at %></td>
+                  <td>
+                    <% if (f.expires_at) { %>
+                      <%= f.expires_at %>
+                    <% } else { %>
+                      期限なし
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (isPdf || isImage) { %>
+                      <a href="/files/<%= f.id %>/preview" target="_blank">プレビュー</a>
+                    <% } %>
+                    <a href="/files/<%= f.id %>/download">DL</a>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          <button type="submit">選択したファイルをZIPでダウンロード</button>
+        </form>
+      </section>
+      <% } %>
+
+    </main>
+    <script src="/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>グループ管理 - ファイル配布サイト</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">ファイル配布サイト</div>
+      <div class="header-right">
+        <% if (currentUser) { %>
+          <span class="user-label"><%= currentUser.full_name || currentUser.username %>（<%= currentUser.role %>）</span>
+        <% } %>
+        <button type="button" class="theme-toggle" id="theme-toggle">🌓</button>
+        <% if (currentUser) { %>
+          <button type="button" class="menu-toggle" id="menu-toggle">☰</button>
+        <% } %>
+      </div>
+    </header>
+
+    <% if (currentUser) { %>
+    <nav class="overlay-menu" id="overlay-menu">
+      <div class="overlay-inner">
+        <button type="button" class="close-btn" id="menu-close">×</button>
+        <ul>
+          <li><a href="/dashboard">マイファイル</a></li>
+          <li><a href="/account">アカウント設定</a></li>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager') { %>
+            <li><a href="/admin/users">ユーザー管理</a></li>
+            <li><a href="/admin/groups">グループ管理</a></li>
+          <% } %>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager' || currentUser.role === 'file-manager') { %>
+            <li><a href="/admin/files">ファイル管理</a></li>
+          <% } %>
+          <% if (currentUser.role === 'root' || currentUser.role === 'manager') { %>
+            <li><a href="/admin/logs">操作ログ</a></li>
+          <% } %>
+          <li><a href="/logout">ログアウト</a></li>
+        </ul>
+      </div>
+    </nav>
+    <% } %>
+
+    <main class="container">
+      <h1>グループ管理</h1>
+
+      <section class="card">
+        <h2>グループ作成</h2>
+        <form method="post" action="/admin/groups/create" class="form">
+          <label>グループ名
+            <input type="text" name="name" required />
+          </label>
+          <label>メモ（任意）
+            <input type="text" name="note" />
+          </label>
+          <button type="submit">作成</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>グループ一覧</h2>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>グループ名</th>
+              <th>メモ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% groups.forEach(g => { %>
+              <tr>
+                <td><%= g.id %></td>
+                <td><%= g.name %></td>
+                <td><%= g.note || '—' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>所属ユーザー一覧</h2>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>グループID</th>
+              <th>グループ名</th>
+              <th>ユーザーID</th>
+              <th>ユーザー名</th>
+              <th>氏名</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% groupUsers.forEach(r => { %>
+              <tr>
+                <td><%= r.group_id %></td>
+                <td><%= r.group_name %></td>
+                <td><%= r.user_id %></td>
+                <td><%= r.username %></td>
+                <td><%= r.full_name || '—' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </section>
+
+    </main>
+    <script src="/main.js"></script>
+  </body>
+</html>
